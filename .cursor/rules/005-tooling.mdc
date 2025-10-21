@@ -1,0 +1,25 @@
+---
+alwaysApply: true
+---
+## Vite-First Workflow
+- Scaffold Norune as a Vite + TypeScript + React project; treat Vite as the authoritative dev/build toolchain.
+- Ensure `package.json` exposes `npm run dev` (HMR-enabled dev server), `npm run build` (production bundle), and `npm run preview`.
+- Configure Vite server with HTTPS enabled for wallet integrations (`server.https` / localhost cert) and CORS relaxed only for known RPC origins.
+- Keep HMR resilient by colocating styles (SCSS modules) with components and relying on Vite's CSS handling; fall back to full reload only when Solana providers need fresh signatures.
+
+## Configuration Standards
+- Maintain `vite.config.ts` with path aliases that mirror our domain structure (`@three`, `@scss`, `@solana`, `@ux`).
+- Integrate environment variables via `.env`, `.env.local`, and `.env.production`; namespaced with `VITE_` and documented in `docs/contributing.md`.
+- Register Three.js asset handling (GLB, textures) through Vite's asset pipeline with explicit `assetsInclude` entries.
+- Add custom plugin to expose `docs/anza-xyz-kit` MD resources in DevTools for inline reference without bundling them into production.
+
+## Dependency Harmony
+- Ensure Vite's optimizeDeps includes `@anza-xyz/kit`, `@solana/web3.js`, and `three` to avoid cold-start lag during dev.
+- Configure SSR build option (even if unused) so future node-side rendering or testing frameworks can reuse the config.
+- Wire SCSS global includes via `css.preprocessorOptions.scss.additionalData` to share token files (`tokens/_core.scss`) without redundant imports.
+
+## Developer Experience
+- Provide ESLint + TypeScript path mapping aligned with Vite aliases; run linting through `npm run lint` with Vite-aware parser settings.
+- Add `npm run typecheck` invoking `tsc --noEmit` so CI validates type safety independent of Vite builds.
+- Document the dev server workflow in `docs/contributing.md`, including how to run Phantom wallet connector in dev HTTPS contexts.
+- Establish a `scripts/dev-cert.ps1` (or shell equivalent) to mint trusted localhost certificates and store guidance under `docs/observability/runbooks.md`.

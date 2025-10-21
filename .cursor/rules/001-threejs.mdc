@@ -1,0 +1,31 @@
+---
+alwaysApply: true
+---
+## Vision
+- Deliver a cozy, stylized 3D town-builder that channels Dark Cloud nostalgia while feeling native to the web.
+- Prioritize solid frame pacing on mid-tier laptops; target 60fps with graceful degradation to 30fps.
+- Every 3D interaction must support keyboard navigation fallbacks for users who cannot rely on pointer or gamepad.
+
+## Scene Architecture
+- Bootstrap Three.js canvases through an `initNoruneScene` factory that returns renderer, scene, camera, clock, and disposer utilities.
+- Store scene graph composition in pure functions; mutate objects only inside the animation loop or explicit effect hooks.
+- Treat each gameplay zone as a lazy-loaded module with isolated asset manifests and a shared `TownState` interface.
+- Subscribe to Solana state (see 003-solana) inside a `useTownState` hook that hydrates scene entities after wallet readiness.
+
+## Assets & Performance
+- Author assets as GLB with Draco compression; bake lighting where possible and keep textures <= 2K unless justified.
+- Use `InstancedMesh` for repeated props (trees, housing modules, npcs) and pool geometries/materials globally.
+- Gate post-processing (bloom, SSAO) behind feature flags derived from device memory and frame timing heuristics.
+- Profile animation loops with `navigator.scheduling.isInputPending` to throttle non-critical updates under load.
+
+## Experience & Accessibility
+- Mirror major scene interactions with DOM annotations for screen readers; expose ARIA-live narrations for town events.
+- Emit condensed 2D overlays for core stats (resources, time of day) synced from the same observable that drives 3D labels.
+- Provide colorblind-safe palettes when translating SCSS variables into shader uniforms, with documented token mappings.
+- Ensure camera transitions respect user reduced-motion preferences; fall back to crossfade plus minimal dolly movement.
+
+## Delivery Workflow
+- Develop interactively with WebGL debug tools off by default; enable via `?debug` query to avoid leaking in production builds.
+- Check in scene snapshots as deterministic JSON saved from the state schema, never as floating Three.js object dumps.
+- Ship every PR with a recorded WebM or sequence of annotated screenshots showing the new or affected interactions.
+- Run `npm run lint:webgl` (custom rule set) before pushing to guarantee scene factories and disposers remain leak-free.

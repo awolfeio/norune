@@ -1,0 +1,30 @@
+---
+alwaysApply: true
+---
+## Visual Language
+- Build a luminous, dreamlike UI that complements the 3D world without overpowering it; UI should feel like an in-game HUD.
+- Respect accessibility contrast minimums (AA at 4.5:1) even when leaning into moody palettes inspired by Dark Cloud.
+- Favor motion as feedback, not decoration; offer meaningful reduce-motion fallbacks in parallel to Three.js cues.
+
+## Architecture
+- Organize styles with a layered structure: `settings` (tokens), `tools` (mixins/functions), `generic`, `objects`, `components`, `utilities`.
+- Scope component styles via `data-component="Name"` hooks rather than raw element selectors to coexist with AEM content.
+- Mirror 3D entities in UI by naming SCSS files after domain concepts (e.g., `town-ledger`, `build-queue`) instead of generic UI nouns.
+- Co-locate SCSS with its JS/TS module when the pair is exclusive; otherwise, house shared styles in `ui/cdn/sass/norune`.
+
+## Tokens & Themes
+- Declare color, spacing, and typography tokens in a `tokens/_core.scss` file; expose CSS custom properties on `:root[data-theme]`.
+- Document bridges between SCSS tokens and shader uniforms in `css-overview.md` to keep HUD and scene lighting cohesive.
+- Never hardcode absolute pixel values for spacing larger than 8px; compose from tokenized multipliers.
+- Map Solana state (e.g., town level, biome) to theme modifiers via a dedicated `_biome-variants.scss` partial with clear defaults.
+
+## Craftsmanship
+- Keep selector depth to <= 3 levels; prefer composition with mixins or utility classes for deeper hierarchies.
+- Author mixins with explicit parameter defaults and use TypeScript `satisfies` checks when generating CSS vars from config.
+- Use `@use` with namespace aliases; forbid `@import`.
+- Run `npm run lint:styles` and `npm run test:visual` (Backstop or equivalent) before submitting a PR that touches SCSS.
+
+## Handoff & Documentation
+- Update component README files with screenshots or short gifs showing HUD states for each major UI change.
+- Annotate complex layout sections with lightweight comments describing intent and key breakpoints.
+- When creating new utilities, append entries to `.cursor/rules/002-scss.mdc` to keep the rule set living and discoverable.

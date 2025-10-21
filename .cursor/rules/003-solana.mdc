@@ -1,0 +1,40 @@
+---
+alwaysApply: true
+---
+## Guiding Goals
+- Wallet connection doubles as game login; experiences must function in read-only mode but gate town edits behind signature.
+- Persist town progress immutably on Solana while caching in IndexedDB for optimistic UX.
+- Favor clarity and safety over novelty; every chain interaction must be auditable and reproducible.
+
+## Toolkit Foundations
+- Initialize wallet flows with `@anza-xyz/kit` connectors; expose Phantom as default while keeping kit-agnostic abstractions for future wallets.
+- House blockchain logic inside `packages/blockchain` with modules for `connection`, `wallet`, `transactions`, and `state`.
+- Share a single `createLegacyTransports()` call (kit default) to avoid duplicate websocket connections across React roots.
+- Track connectivity status via a lightweight state machine (`idle -> connecting -> ready -> error`) consumed by Three.js and UI layers.
+
+## State & Persistence
+- Define a canonical `TownState` schema (Zod) stored on-chain via a Solana program and mirrored client-side through kit's Anchor helpers.
+- Write optimistic updates to IndexedDB immediately, roll back when the confirmed transaction diverges, and surface diffs in DevTools.
+- Batch structural updates (building placement, biome changes) into deterministic instructions so replays yield identical towns.
+- Include a `version` field in every state payload; migrations must be idempotent and logged in `docs/state-migrations.md`.
+
+## Transactions & Security
+- Require explicit user confirmation for any instruction that spends tokens; display preflight summaries with human-friendly copy.
+- Simulate instructions locally (`connection.simulateTransaction`) before requesting signatures and display failure hints to the player.
+- Sign and send transactions through kit's `sendAndConfirm` helpers with retry limits and exponential backoff capped at 3 attempts.
+- Encrypt any off-chain backups using the wallet's `signMessage` derived key; never store private keys or raw seeds.
+- Enforce program-derived-address ownership checks in every instruction; reject mismatched seeds or bump values client-side before signing.
+- Align with Solana secure client patterns: wrap RPC calls in request guards, validate all user-provided public keys, and cap lamport transfers without explicit budget approvals.
+
+## Environments & Testing
+- Develop against Solana devnet by default; provide a feature flag to switch to localnet for deterministic integration tests.
+- Record contract IDs and deployment commands in `docs/solana-deployments.md`, one section per environment.
+- Ship end-to-end tests that stub wallet providers to validate login, town load, and persistence flows without hitting the chain.
+- Before release, run load tests that simulate 500 concurrent town updates to validate program limits and RPC throughput.
+- Capture regression fixtures for chain interactions (serialized transactions, expected logs) and replay them whenever Solana or kit versions change.
+
+## Documentation & Knowledge Base
+- Store authoritative kit references under `docs/anza-xyz-kit`; sync with upstream `main` at least monthly or when kit dependency updates.
+- Maintain a `docs/solana-playbook.md` detailing deployment, upgrade, and rollback procedures observable by the LLM agent.
+- Track security reviews and external audit notes in `docs/security/solana-audit-log.md` so remediation tasks become discoverable.
+- Document wallet support matrices and known issues in `docs/wallet-compatibility.md`, updating whenever kit configuration changes.

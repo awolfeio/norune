@@ -1,0 +1,38 @@
+---
+alwaysApply: true
+---
+## Core Principles
+- Evoke Dark Cloud nostalgia with a warm, playful interface while grounding every flow in clarity and trust.
+- Communicate wallet-connected identity at all times; players must know when actions are on-chain, cached, or pending.
+- Craft interactions that feel welcoming to both crypto newcomers and veterans, minimizing jargon and surprise.
+
+## Onboarding & Identity
+- Surface the `Connect with Phantom` CTA immediately, with a secondary "Explore in Spectator Mode" option for read-only browsing.
+- After wallet connection, present a username picker bound to the wallet signature; validate uniqueness and display the binding summary.
+- Persist onboarding progress so reloading mid-flow resumes at the last completed step.
+- Provide context links explaining wallet safety, state permanence, and how usernames map to Solana accounts.
+
+## Tutorial Experience
+- Launch a paginated tutorial modal on first login, covering wallet safety, world overview, camera controls, and avatar mode.
+- Allow players to skip or revisit the tutorial from a `Guidebook` control; log completion state per wallet.
+- Each tutorial page should combine short copy (<= 120 chars) with illustrative visuals or mini-clips.
+- Include call-to-action buttons that trigger guided UI highlights (spotlight overlay) when closing the tutorial.
+
+## World Overview
+- Introduce the 512x512 plot with a labeled HUD overlay showing grid coordinates, biome, and resource summaries.
+- Display an unobtrusive grid toggle to help visualize placement without overwhelming the scene aesthetics.
+- Offer quick tips on how the grid supports future building, farming, waterways, and ornaments.
+- Provide accessible text descriptions for the plot layout so screen readers narrate key terrain features.
+
+## Camera & Navigation
+- Default to an aerial, slightly isometric camera that orbits the plot center while clamped above ground to prevent subterranean views.
+- Support smooth drag or right-stick orbiting with dampened easing; expose keyboard bindings (Q/E) for rotational nudge.
+- Integrate pinch/scroll zoom with bounds that maintain context; show a minimap inset when zooming close.
+- Surface a "Reset Camera" command that snaps back to default framing without disorienting animations when reduce-motion is enabled.
+
+## Avatar Possession Mode
+- Provide a Street View–style drag-and-drop entry: dragging the avatar icon onto the grid transitions from aerial to ground-level view.
+- Animate the swap with a brief dissolve and maintain orientation continuity so the avatar spawns facing the dropped location.
+- Control the avatar with WASD (or analog stick), with Space for interaction prompts and Shift for contextual sprint if available.
+- Present unobtrusive HUD indicators for controls, stamina (if applicable), and exit-to-orbit button.
+- Sync avatar state with Solana gameplay data so position, inventory, and interaction logs remain consistent between modes.
