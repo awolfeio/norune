@@ -9,7 +9,7 @@ type TownViewportProps = {
 
 export function TownViewport({ mode, latestSlot }: TownViewportProps) {
   return (
-    <section className="relative flex min-h-[420px] flex-1 flex-col gap-4 rounded-3xl border border-white/10 bg-gradient-to-b from-white/10 to-black/40 p-4 shadow-xl">
+    <section className="relative flex h-full min-h-[480px] flex-col gap-4 rounded-3xl border border-white/10 bg-gradient-to-b from-white/10 to-black/40 p-4 shadow-xl">
       <header className="flex items-center justify-between gap-3">
         <div>
           <p className="text-xs uppercase tracking-[0.35em] text-purple-200">

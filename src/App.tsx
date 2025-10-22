@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { shallow } from 'zustand/shallow';
 
 import { useLatestSlot } from '@app/solana/useLatestSlot';
@@ -52,6 +52,8 @@ export default function App() {
   const [profileStatus, setProfileStatus] = useState<ProfileStatus>('idle');
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profile, setProfile] = useState<PlayerProfile | null>(null);
+  const [isMenuOpen, setMenuOpen] = useState(false);
+  const menuContainerRef = useRef<HTMLDivElement | null>(null);
 
   const {
     username,
@@ -98,6 +100,33 @@ export default function App() {
   }, [tutorialCompleted]);
 
   useEffect(() => {
+    if (!isMenuOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setMenuOpen(false);
+        setHeroDragging(false);
+      }
+    };
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!menuContainerRef.current) return;
+      if (!menuContainerRef.current.contains(event.target as Node)) {
+        setMenuOpen(false);
+        setHeroDragging(false);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('mousedown', handlePointerDown);
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('mousedown', handlePointerDown);
+    };
+  }, [isMenuOpen]);
+
+  useEffect(() => {
     const provider = getPhantomProvider();
     setPhantomProvider(provider);
     if (!provider) return;
@@ -119,8 +148,14 @@ export default function App() {
       });
     };
 
-    const handleAccountChanged = (publicKey: PhantomPublicKey | null) => {
+    const handleAccountChanged = (
+      publicKey: PhantomPublicKey | string | null
+    ) => {
       setWalletFromPublicKey(publicKey);
+    };
+
+    const accountChangedListener = (publicKey: unknown) => {
+      handleAccountChanged(publicKey as PhantomPublicKey | string | null);
     };
 
     const handleDisconnect = () => {
@@ -128,7 +163,7 @@ export default function App() {
       clearSignInProof();
     };
 
-    provider.on('accountChanged', handleAccountChanged);
+    provider.on('accountChanged', accountChangedListener);
     provider.on('disconnect', handleDisconnect);
 
     const ensureConnected = async () => {
@@ -145,7 +180,7 @@ export default function App() {
     void ensureConnected();
 
     return () => {
-      provider.removeListener?.('accountChanged', handleAccountChanged);
+      provider.removeListener?.('accountChanged', accountChangedListener);
       provider.removeListener?.('disconnect', handleDisconnect);
     };
   }, [setWallet, clearWallet, clearSignInProof]);
@@ -297,7 +332,7 @@ export default function App() {
   }, [walletAddress, requireSignInMessage, username, signInProof]);
 
   return (
-    <div className="flex min-h-screen flex-col gap-8 px-6 py-8 md:px-10 md:py-10">
+    <div className="flex min-h-screen flex-col gap-6 px-6 py-8 md:px-10 md:py-10">
       <header className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div className="flex flex-col gap-3">
           <p className="text-xs uppercase tracking-[0.5em] text-purple-200">
@@ -312,81 +347,92 @@ export default function App() {
             wallet on Solana.
           </p>
         </div>
-        <WalletControl
-          isConnected={isWalletConnected}
-          address={walletAddress}
-          onButtonClick={() => {
-            setWalletModalOpen(true);
-            setConnectionError(null);
-          }}
-        />
-      </header>
-
-      <main className="grid flex-1 grid-cols-1 gap-8 lg:grid-cols-[320px_1fr]">
-        <aside className="flex flex-col gap-6">
-          <UsernameForm
-            username={username}
-            onUsernameChange={setUsername}
-            onConfirm={handleUsernameConfirm}
-            disabled={!isWalletConnected}
-            status={profileStatus}
-            errorMessage={profileError}
-          />
-
-          <SignInWithSolanaCard
-            walletAddress={walletAddress}
-            username={username}
-            onSigned={handleSignInProof}
-            onReset={handleSignInReset}
-            proof={signInProof}
-            verificationStatus={verificationStatus}
-            verificationError={verificationError}
-          />
-
-          <ExperienceModeToggle
-            mode={pendingMode}
-            disabled={!isWalletConnected}
-            onChange={(nextMode) => {
-              setPendingMode(nextMode);
-              setMode(nextMode);
+        <div
+          ref={menuContainerRef}
+          className="relative flex items-center gap-2 self-end md:self-start"
+        >
+          <button
+            type="button"
+            onClick={() =>
+              setMenuOpen((open) => {
+                if (open) {
+                  setHeroDragging(false);
+                }
+                return !open;
+              })
+            }
+            aria-expanded={isMenuOpen}
+            aria-haspopup="true"
+            aria-controls="norune-nav-menu"
+            aria-label="Toggle Norune menu"
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white transition hover:bg-white/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              width="18"
+              height="18"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <line x1="4" y1="6" x2="20" y2="6" />
+              <line x1="4" y1="12" x2="20" y2="12" />
+              <line x1="4" y1="18" x2="20" y2="18" />
+            </svg>
+          </button>
+          <WalletControl
+            isConnected={isWalletConnected}
+            address={walletAddress}
+            onButtonClick={() => {
+              setWalletModalOpen(true);
+              setConnectionError(null);
             }}
           />
-
-          <div className="rounded-xl border border-dashed border-white/20 bg-black/20 p-4 text-sm text-white/70">
-            <p className="text-xs uppercase tracking-[0.3em] text-purple-200">
-              Avatar Token
-            </p>
-            <p className="mt-2">
-              Drag this hero onto your plot to possess them, Street View style.
-              Once dropped, use WASD + Shift to roam.
-            </p>
-            <button
-              type="button"
-              draggable
-              onDragStart={() => setHeroDragging(true)}
-              onDragEnd={() => setHeroDragging(false)}
-              className="mt-3 inline-flex items-center gap-2 rounded-full bg-purple-500 px-4 py-2 text-sm font-semibold text-white shadow-lg hover:bg-purple-400 active:translate-y-[1px]"
-            >
-              <span className="grid h-6 w-6 place-items-center rounded-full bg-white/20 text-xs font-bold">
-                ⭑
-              </span>
-              Drag hero
-            </button>
-            <button
-              type="button"
-              className="mt-3 inline-flex items-center gap-2 rounded-lg border border-white/20 px-3 py-2 text-xs font-semibold text-white/70 hover:bg-white/10"
-              onClick={() => {
+          {isMenuOpen ? (
+            <NavMenuDropdown
+              username={username}
+              onUsernameChange={setUsername}
+              onUsernameConfirm={handleUsernameConfirm}
+              profileStatus={profileStatus}
+              profileError={profileError}
+              walletAddress={walletAddress}
+              isWalletConnected={isWalletConnected}
+              signInProof={signInProof}
+              verificationStatus={verificationStatus}
+              verificationError={verificationError}
+              onSignInProof={handleSignInProof}
+              onResetSignIn={handleSignInReset}
+              mode={mode}
+              pendingMode={pendingMode}
+              onModeChange={(nextMode) => {
+                setPendingMode(nextMode);
+                setMode(nextMode);
+              }}
+              onOrbitReset={() => {
                 setMode('orbit');
                 setPendingMode('orbit');
               }}
-            >
-              Reset camera
-            </button>
-          </div>
-        </aside>
+              tutorialCompleted={tutorialCompleted}
+              profile={profile}
+              onHeroDragStart={() => {
+                if (!isWalletConnected) return false;
+                setHeroDragging(true);
+                setMenuOpen(false);
+                return true;
+              }}
+              onHeroDragEnd={() => setHeroDragging(false)}
+              closeMenu={() => setMenuOpen(false)}
+              requireSignInMessage={requireSignInMessage}
+            />
+          ) : null}
+        </div>
+      </header>
 
+      <main className="flex flex-1 flex-col overflow-hidden">
         <div
-          className={`flex flex-col gap-6 ${
+          className={`relative flex-1 min-h-[70vh] overflow-hidden ${
             isHeroDragging
               ? 'ring-2 ring-purple-400 ring-offset-4 ring-offset-purple-900/40'
               : ''
@@ -394,6 +440,9 @@ export default function App() {
           onDragOver={(event) => {
             if (!isWalletConnected) return;
             event.preventDefault();
+          }}
+          onDragLeave={() => {
+            setHeroDragging(false);
           }}
           onDrop={(event) => {
             event.preventDefault();
@@ -404,60 +453,6 @@ export default function App() {
           }}
         >
           <TownViewport mode={mode} latestSlot={slot} />
-          <section className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/70">
-            <h2 className="text-base font-semibold text-white">
-              Session Overview
-            </h2>
-            <ul className="mt-3 space-y-2 text-xs text-white/60">
-              <li>
-                Wallet:{' '}
-                {walletAddress ? (
-                  <span className="font-mono text-sm text-white">
-                    Phantom · {truncate(walletAddress)}
-                  </span>
-                ) : (
-                  <span className="font-semibold text-white/40">
-                    Not connected
-                  </span>
-                )}
-              </li>
-              <li>
-                Username:{' '}
-                <span className="font-semibold text-white">
-                  {username || 'Not set'}
-                </span>
-              </li>
-              <li>
-                Mode: {mode === 'orbit' ? 'Orbit view' : 'Avatar possession'}
-              </li>
-              <li>
-                Tutorial:{' '}
-                {tutorialCompleted
-                  ? 'Completed'
-                  : 'Pending — will show on login'}
-              </li>
-              <li>
-                Sign-in:{' '}
-                {verificationStatus === 'success' && signInProof
-                  ? `Signature captured at ${new Date(
-                      signInProof.signedAt
-                    ).toLocaleTimeString()}`
-                  : verificationStatus === 'error'
-                  ? verificationError ?? 'Verification failed'
-                  : 'Pending wallet signature'}
-              </li>
-              <li>
-                Profile:{' '}
-                {profileStatus === 'saved' && profile
-                  ? `Bound at ${new Date(profile.updatedAt).toLocaleTimeString()}`
-                  : profileStatus === 'error'
-                  ? profileError ?? 'Profile error'
-                  : profileStatus === 'saving'
-                  ? 'Saving…'
-                  : 'Not saved'}
-              </li>
-            </ul>
-          </section>
         </div>
       </main>
 
@@ -621,6 +616,189 @@ function truncate(value: string, visible = 4) {
   if (!value) return '';
   if (value.length <= visible * 2) return value;
   return `${value.slice(0, visible)}…${value.slice(-visible)}`;
+}
+
+type NavMenuDropdownProps = {
+  username: string;
+  onUsernameChange: (value: string) => void;
+  onUsernameConfirm: () => Promise<void>;
+  profileStatus: ProfileStatus;
+  profileError: string | null;
+  walletAddress: string | null;
+  isWalletConnected: boolean;
+  signInProof: SignInProof | null;
+  verificationStatus: SignInStatus;
+  verificationError: string | null;
+  onSignInProof: (proof: SignInProof) => Promise<void>;
+  onResetSignIn: () => void;
+  mode: ExperienceMode;
+  pendingMode: ExperienceMode;
+  onModeChange: (mode: ExperienceMode) => void;
+  onOrbitReset: () => void;
+  tutorialCompleted: boolean;
+  profile: PlayerProfile | null;
+  onHeroDragStart: () => boolean;
+  onHeroDragEnd: () => void;
+  closeMenu: () => void;
+  requireSignInMessage: string | null;
+};
+
+function NavMenuDropdown({
+  username,
+  onUsernameChange,
+  onUsernameConfirm,
+  profileStatus,
+  profileError,
+  walletAddress,
+  isWalletConnected,
+  signInProof,
+  verificationStatus,
+  verificationError,
+  onSignInProof,
+  onResetSignIn,
+  mode,
+  pendingMode,
+  onModeChange,
+  onOrbitReset,
+  tutorialCompleted,
+  profile,
+  onHeroDragStart,
+  onHeroDragEnd,
+  closeMenu,
+  requireSignInMessage,
+}: NavMenuDropdownProps) {
+  return (
+    <div
+      id="norune-nav-menu"
+      role="menu"
+      className="absolute right-0 top-12 z-40 w-[min(360px,calc(100vw-2rem))] max-h-[80vh] overflow-y-auto rounded-2xl border border-white/10 bg-black/90 p-5 text-white shadow-2xl backdrop-blur-xl"
+    >
+      <div className="flex flex-col gap-5">
+        <ExperienceModeToggle
+          mode={pendingMode}
+          disabled={!isWalletConnected}
+          onChange={(nextMode) => {
+            onModeChange(nextMode);
+          }}
+        />
+
+        <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-white/70">
+          <p className="text-xs uppercase tracking-[0.3em] text-purple-200">
+            Avatar Token
+          </p>
+          <p className="mt-2">
+            Drag this hero onto your plot to possess them, Street View style.
+            Once dropped, use WASD + Shift to roam.
+          </p>
+          <button
+            type="button"
+            draggable
+            onDragStart={(event) => {
+              if (!onHeroDragStart()) {
+                event.preventDefault();
+                return;
+              }
+              event.dataTransfer.effectAllowed = 'copy';
+              event.dataTransfer.setData('text/plain', 'avatar');
+            }}
+            onDragEnd={onHeroDragEnd}
+            className="mt-4 inline-flex items-center gap-2 rounded-full bg-purple-500 px-4 py-2 text-sm font-semibold text-white shadow-lg transition hover:bg-purple-400 active:translate-y-[1px]"
+          >
+            <span className="grid h-6 w-6 place-items-center rounded-full bg-white/20 text-xs font-bold">
+              AV
+            </span>
+            Drag hero onto land
+          </button>
+          <button
+            type="button"
+            className="mt-3 inline-flex items-center gap-2 rounded-lg border border-white/20 px-3 py-2 text-xs font-semibold text-white/70 transition hover:bg-white/10"
+            onClick={() => {
+              onOrbitReset();
+              closeMenu();
+            }}
+          >
+            Reset to orbit view
+          </button>
+        </div>
+
+        <SignInWithSolanaCard
+          walletAddress={walletAddress}
+          username={username}
+          onSigned={onSignInProof}
+          onReset={onResetSignIn}
+          proof={signInProof}
+          verificationStatus={verificationStatus}
+          verificationError={verificationError}
+        />
+
+        <UsernameForm
+          username={username}
+          onUsernameChange={onUsernameChange}
+          onConfirm={onUsernameConfirm}
+          disabled={
+            !isWalletConnected ||
+            verificationStatus !== 'success' ||
+            !signInProof
+          }
+          status={profileStatus}
+          errorMessage={profileError}
+        />
+        {requireSignInMessage ? (
+          <p className="rounded-lg border border-dashed border-purple-300/40 bg-purple-500/10 px-3 py-2 text-xs text-purple-100/80">
+            {requireSignInMessage}
+          </p>
+        ) : null}
+
+        <div className="space-y-2 rounded-xl border border-white/10 bg-white/5 p-4 text-xs text-white/70">
+          <h2 className="text-sm font-semibold text-white">Session Overview</h2>
+          <p>
+            <span className="font-semibold text-white">Wallet:</span>{' '}
+            {walletAddress ? (
+              <span className="font-mono text-white/80">
+                Phantom - {truncate(walletAddress)}
+              </span>
+            ) : (
+              'Not connected'
+            )}
+          </p>
+          <p>
+            <span className="font-semibold text-white">Username:</span>{' '}
+            {username || 'Not set'}
+          </p>
+          <p>
+            <span className="font-semibold text-white">Mode:</span>{' '}
+            {mode === 'orbit' ? 'Orbit planning' : 'Avatar possession'}
+          </p>
+          <p>
+            <span className="font-semibold text-white">Tutorial:</span>{' '}
+            {tutorialCompleted ? 'Completed' : 'Pending'}
+          </p>
+          <p>
+            <span className="font-semibold text-white">Sign-in:</span>{' '}
+            {verificationStatus === 'success' && signInProof
+              ? `Signature captured at ${new Date(
+                  signInProof.signedAt
+                ).toLocaleTimeString()}`
+              : verificationStatus === 'error'
+              ? verificationError ?? 'Verification failed'
+              : 'Pending wallet signature'}
+          </p>
+          <p>
+            <span className="font-semibold text-white">Profile:</span>{' '}
+            {profileStatus === 'saved' && profile
+              ? `Bound at ${new Date(
+                  profile.updatedAt
+                ).toLocaleTimeString()}`
+              : profileStatus === 'error'
+              ? profileError ?? 'Profile error'
+              : profileStatus === 'saving'
+              ? 'Saving...'
+              : 'Not saved'}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function publicKeyToString(publicKey: PhantomPublicKey | string | null) {

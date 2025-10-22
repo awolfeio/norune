@@ -30,7 +30,7 @@ type SessionState = {
   setWallet: (wallet: WalletBinding) => void;
   clearWallet: () => void;
   signInProof: SignInProof | null;
-  setSignInProof: (proof: SignInProof) => void;
+  setSignInProof: (proof: SignInProof | null) => void;
   clearSignInProof: () => void;
 };
 

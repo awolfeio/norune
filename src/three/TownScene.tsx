@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import Stats from 'stats.js';
-import { GUI } from 'lil-gui';
+import GUI from 'lil-gui';
 
 import type { ExperienceMode } from '@state/sessionStore';
 
@@ -11,8 +11,9 @@ const OUTSKIRTS_MARGIN = 256;
 const TOTAL_SIZE = PLAYABLE_SIZE + OUTSKIRTS_MARGIN * 2;
 const HALF_PLAYABLE = PLAYABLE_SIZE / 2;
 const GRID_CELL_SIZE = 16;
-const PLAYABLE_DIVISIONS = PLAYABLE_SIZE / GRID_CELL_SIZE;
-const TOTAL_DIVISIONS = TOTAL_SIZE / GRID_CELL_SIZE;
+const SUBDIVISIONS_PER_CELL = 2;
+const CELLS_PER_SIDE = TOTAL_SIZE / GRID_CELL_SIZE;
+const SEGMENTS_PER_SIDE = CELLS_PER_SIDE * SUBDIVISIONS_PER_CELL;
 const SUN_DISTANCE = 620;
 const DEFAULT_GRID_OPACITY = 0.2;
 
@@ -24,6 +25,10 @@ const GRASS_TEXTURE = new URL(
   '../assets/grass-texture-seamless.jpg',
   import.meta.url
 ).href;
+const ENVIRONMENT_PRESETS = {
+  Fantasy: ENVIRONMENT_MAP
+} as const;
+type EnvironmentPreset = keyof typeof ENVIRONMENT_PRESETS;
 
 export function TownScene({ mode }: { mode: ExperienceMode }) {
   const canvasContainerRef = useRef<HTMLDivElement | null>(null);
@@ -32,7 +37,7 @@ export function TownScene({ mode }: { mode: ExperienceMode }) {
   const modeRef = useRef<ExperienceMode>(mode);
   const pressedKeysRef = useRef<Set<string>>(new Set());
   const statsRef = useRef<Stats | null>(null);
-  const guiRef = useRef<GUI | null>(null);
+  const guiRef = useRef<InstanceType<typeof GUI> | null>(null);
   const guiWrapperRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -77,12 +82,12 @@ export function TownScene({ mode }: { mode: ExperienceMode }) {
       alpha: true
     });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.domElement.style.width = '100%';
+    renderer.domElement.style.height = '100%';
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.05;
-    renderer.useLegacyLights = false;
     container.appendChild(renderer.domElement);
 
     const stats = new Stats();
@@ -105,7 +110,12 @@ export function TownScene({ mode }: { mode: ExperienceMode }) {
     guiWrapperRef.current = guiWrapper;
     container.appendChild(guiWrapper);
 
-    const gui = new GUI({ width: 260, autoPlace: false });
+    const gui = new GUI();
+    gui.domElement.style.width = '260px';
+    gui.domElement.classList.add('norune-gui');
+    if (gui.domElement.parentElement) {
+      gui.domElement.parentElement.removeChild(gui.domElement);
+    }
     guiWrapper.appendChild(gui.domElement);
     guiRef.current = gui;
 
@@ -130,6 +140,37 @@ export function TownScene({ mode }: { mode: ExperienceMode }) {
     controls.maxPolarAngle = Math.PI / 2.1;
     controls.target.set(0, 0, 0);
     controlsRef.current = controls;
+
+    const setRendererSize = (width: number, height: number) => {
+      if (width <= 0 || height <= 0) {
+        console.warn(
+          `[TownScene] Skipping size update due to invalid dimensions: ${width}x${height}`
+        );
+        return;
+      }
+      const safeWidth = Math.max(1, Math.floor(width));
+      const safeHeight = Math.max(1, Math.floor(height));
+      renderer.setSize(safeWidth, safeHeight, false);
+      camera.aspect = safeWidth / safeHeight;
+      camera.updateProjectionMatrix();
+    };
+
+    const initialRect = container.getBoundingClientRect();
+    if (initialRect.width <= 0 || initialRect.height <= 0) {
+      console.warn(
+        `[TownScene] Container has zero dimensions on mount: ${initialRect.width}x${initialRect.height}`
+      );
+    } else {
+      console.info(
+        `[TownScene] Renderer initialized: ${Math.round(initialRect.width)}x${Math.round(
+          initialRect.height
+        )}`
+      );
+    }
+    setRendererSize(
+      Math.max(1, Math.floor(initialRect.width)),
+      Math.max(1, Math.floor(initialRect.height))
+    );
 
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
     scene.add(ambientLight);
@@ -164,14 +205,15 @@ export function TownScene({ mode }: { mode: ExperienceMode }) {
 
     const environmentState = { current: null as THREE.Texture | null };
     const envConfig = {
-      environment: 'Fantasy',
+      environment: 'Fantasy' as EnvironmentPreset,
       showBackground: true
     };
 
-    const loadEnvironment = () => {
+    const loadEnvironment = (preset: EnvironmentPreset) => {
+      const mapUrl = ENVIRONMENT_PRESETS[preset] ?? ENVIRONMENT_MAP;
       const loader = new THREE.TextureLoader();
       loader.load(
-        ENVIRONMENT_MAP,
+        mapUrl,
         (texture) => {
           if (disposed) {
             texture.dispose();
@@ -195,6 +237,9 @@ export function TownScene({ mode }: { mode: ExperienceMode }) {
       );
     };
 
+    const terrainConfig = {
+      showTriangleOutline: false
+    };
     const lightingConfig = {
       sunIntensity: directionalLight.intensity,
       sunElevation: 24,
@@ -230,6 +275,13 @@ export function TownScene({ mode }: { mode: ExperienceMode }) {
             ? environmentState.current
             : new THREE.Color('#0b0b1a');
         }
+      });
+
+    gui
+      .add(envConfig, 'environment', Object.keys(ENVIRONMENT_PRESETS))
+      .name('Environment Map')
+      .onChange(() => {
+        loadEnvironment(envConfig.environment);
       });
 
     gui.add(lightingConfig, 'sunIntensity', 0, 3, 0.05)
@@ -272,7 +324,7 @@ export function TownScene({ mode }: { mode: ExperienceMode }) {
 
     const playableGrid = new THREE.GridHelper(
       PLAYABLE_SIZE,
-      PLAYABLE_DIVISIONS,
+      PLAYABLE_SIZE / GRID_CELL_SIZE,
       baseGridColor,
       new THREE.Color('#2b275b')
     );
@@ -330,17 +382,12 @@ export function TownScene({ mode }: { mode: ExperienceMode }) {
 
     loadEnvironment(envConfig.environment);
 
-    const terrainGeometry = new THREE.PlaneGeometry(
-      TOTAL_SIZE,
-      TOTAL_SIZE,
-      1,
-      1
-    );
+    const terrainGeometry = buildTerrainGeometry();
     const terrainTexture = new THREE.TextureLoader().load(GRASS_TEXTURE);
     terrainTexture.colorSpace = THREE.SRGBColorSpace;
     terrainTexture.wrapS = THREE.RepeatWrapping;
     terrainTexture.wrapT = THREE.RepeatWrapping;
-    terrainTexture.repeat.set(TOTAL_SIZE / 32, TOTAL_SIZE / 32);
+    terrainTexture.repeat.set(CELLS_PER_SIDE, CELLS_PER_SIDE);
     terrainTexture.anisotropy = renderer.capabilities.getMaxAnisotropy();
 
     const terrainMaterial = new THREE.MeshStandardMaterial({
@@ -354,6 +401,28 @@ export function TownScene({ mode }: { mode: ExperienceMode }) {
     terrain.receiveShadow = true;
     terrain.name = 'terrain-plane';
     scene.add(terrain);
+
+    const triangleOutlineMaterial = new THREE.LineBasicMaterial({
+      color: new THREE.Color('#ff4fd8'),
+      transparent: true,
+      opacity: 0.75
+    });
+    triangleOutlineMaterial.depthTest = false;
+    triangleOutlineMaterial.depthWrite = false;
+    const triangleOutline = new THREE.LineSegments(
+      new THREE.WireframeGeometry(terrainGeometry),
+      triangleOutlineMaterial
+    );
+    triangleOutline.rotation.x = -Math.PI / 2;
+    triangleOutline.renderOrder = 2;
+    triangleOutline.visible = terrainConfig.showTriangleOutline;
+    scene.add(triangleOutline);
+    gui
+      .add(terrainConfig, 'showTriangleOutline')
+      .name('Show Triangle Mesh')
+      .onChange((value: boolean) => {
+        triangleOutline.visible = value;
+      });
 
     const avatarGeometry = new THREE.SphereGeometry(8, 32, 32);
     const avatarMaterial = new THREE.MeshStandardMaterial({
@@ -373,18 +442,34 @@ export function TownScene({ mode }: { mode: ExperienceMode }) {
     const clock = new THREE.Clock();
     const cameraTarget = new THREE.Vector3();
     const avatarLookAt = new THREE.Vector3();
-
     const frameId = { current: 0 };
-
     const handleResize = () => {
       if (!container) return;
-      const { clientWidth, clientHeight } = container;
-      renderer.setSize(clientWidth, clientHeight);
-      camera.aspect = clientWidth / clientHeight;
-      camera.updateProjectionMatrix();
+      const rect = container.getBoundingClientRect();
+      if (!rect.width || !rect.height) {
+        console.warn(
+          `[TownScene] Window resize detected zero dimensions: ${rect.width}x${rect.height}`
+        );
+        return;
+      }
+      setRendererSize(rect.width, rect.height);
     };
 
     window.addEventListener('resize', handleResize);
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        if (!width || !height) {
+          console.warn(
+            `[TownScene] ResizeObserver reported zero dimensions: ${width}x${height}`
+          );
+          continue;
+        }
+        setRendererSize(width, height);
+      }
+    });
+    resizeObserver.observe(container);
 
     const animate = () => {
       stats.begin();
@@ -426,6 +511,7 @@ export function TownScene({ mode }: { mode: ExperienceMode }) {
       disposed = true;
       cancelAnimationFrame(frameId.current);
       window.removeEventListener('resize', handleResize);
+      resizeObserver.disconnect();
       controls.dispose();
       renderer.dispose();
       terrainGeometry.dispose();
@@ -435,6 +521,8 @@ export function TownScene({ mode }: { mode: ExperienceMode }) {
       avatarMaterial.dispose();
       disposeLineObject(playableGrid);
       disposeLineObject(outskirtsGrid);
+      triangleOutline.geometry.dispose();
+      (triangleOutline.material as THREE.LineBasicMaterial).dispose();
       scene.clear();
       if (renderer.domElement.parentNode) {
         renderer.domElement.parentNode.removeChild(renderer.domElement);
@@ -491,6 +579,17 @@ export function TownScene({ mode }: { mode: ExperienceMode }) {
   );
 }
 
+function buildTerrainGeometry(): THREE.BufferGeometry {
+  const geometry = new THREE.PlaneGeometry(
+    TOTAL_SIZE,
+    TOTAL_SIZE,
+    SEGMENTS_PER_SIDE,
+    SEGMENTS_PER_SIDE
+  );
+  geometry.computeVertexNormals();
+  geometry.computeBoundingSphere();
+  return geometry;
+}
 type GridLikeObject = THREE.Object3D & {
   geometry: THREE.BufferGeometry;
   material: THREE.Material | THREE.Material[];
@@ -640,6 +739,9 @@ function lockAvatarToPlotBounds(avatar: THREE.Mesh) {
     HALF_PLAYABLE - margin
   );
 }
+
+
+
 
 
 

@@ -25,7 +25,7 @@ export function useLatestSlot(pollIntervalMs = 10_000) {
       try {
         const nextSlot = await rpc.getSlot().send();
         if (!disposed) {
-          setSlot(nextSlot);
+          setSlot(Number(nextSlot));
           setError(null);
         }
       } catch (err) {
